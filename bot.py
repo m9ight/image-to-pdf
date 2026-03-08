@@ -3,6 +3,9 @@ import aiosqlite
 import aiofiles
 import logging
 import os
+import uuid
+import tempfile
+import base64
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
@@ -13,7 +16,7 @@ from aiogram.enums import ParseMode
 from aiogram.filters import CommandStart, Command
 from aiogram.types import (
     Message, CallbackQuery, InlineKeyboardMarkup, InlineKeyboardButton,
-    WebAppInfo, MenuButtonWebApp, BotCommand
+    WebAppInfo, MenuButtonWebApp, BotCommand, BufferedInputFile
 )
 from aiogram.client.default import DefaultBotProperties
 from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_application
@@ -21,7 +24,7 @@ from aiogram.webhook.aiohttp_server import SimpleRequestHandler, setup_applicati
 load_dotenv()
 
 BOT_TOKEN  = os.getenv("BOT_TOKEN")
-WEBAPP_URL = os.getenv("WEBAPP_URL")          # https://xxx.railway.app
+WEBAPP_URL = os.getenv("WEBAPP_URL")
 ADMIN_IDS  = [int(x.strip()) for x in os.getenv("ADMIN_IDS", "0").split(",") if x.strip().isdigit()]
 PORT       = int(os.getenv("PORT", 8080))
 
@@ -188,7 +191,8 @@ async def start_handler(message: Message):
         f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> Объединять несколько фото в один PDF\n'
         f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> Менять порядок страниц перетаскиванием\n'
         f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> Настраивать размер, качество, отступы\n'
-        f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> Поддержка JPG, PNG, WEBP, BMP, GIF\n\n'
+        f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> Поддержка JPG, PNG, WEBP, BMP, GIF\n'
+        f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> PDF приходит прямо в чат на любом устройстве\n\n'
         f'<tg-emoji emoji-id="5963103826075456248">⬆</tg-emoji> Нажми кнопку ниже, чтобы открыть конвертер:',
         reply_markup=get_main_keyboard()
     )
@@ -212,7 +216,7 @@ async def help_command(message: Message):
         f'<b>1.</b> Нажми «Открыть конвертер»\n'
         f'<b>2.</b> Загрузи изображения\n'
         f'<b>3.</b> Настрой параметры PDF\n'
-        f'<b>4.</b> Нажми «Конвертировать» и скачай\n\n'
+        f'<b>4.</b> Нажми «Конвертировать» — PDF придёт прямо в чат\n\n'
         f'<b>Команды:</b>\n'
         f'/start — главное меню\n'
         f'/stats — моя статистика\n'
@@ -240,23 +244,17 @@ async def admin_command(message: Message):
 
 @dp.message(F.web_app_data)
 async def web_app_data_handler(message: Message):
+    """Получаем уведомление что PDF уже отправлен через /upload"""
     import json
     await register_user(message.from_user)
     try:
         data = json.loads(message.web_app_data.data)
-        if data.get("action") == "pdf_created":
+        if data.get("action") == "pdf_sent":
+            # PDF уже отправлен через /upload endpoint, просто логируем
             pages     = data.get("pages", 0)
             file_size = data.get("size", 0)
             filename  = data.get("filename", "document.pdf")
             await save_conversion(message.from_user.id, pages, file_size, filename)
-            size_mb = file_size / 1024 / 1024
-            await message.answer(
-                f'<b><tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> PDF успешно создан!</b>\n\n'
-                f'<tg-emoji emoji-id="5886285355279193209">🏷</tg-emoji> <b>Файл:</b> <code>{filename}</code>\n'
-                f'<tg-emoji emoji-id="6035128606563241721">🖼</tg-emoji> <b>Страниц:</b> {pages}\n'
-                f'<tg-emoji emoji-id="5884479287171485878">📦</tg-emoji> <b>Размер:</b> {size_mb:.2f} МБ',
-                reply_markup=get_main_keyboard()
-            )
     except Exception as e:
         logger.error(f"web_app_data error: {e}")
 
@@ -273,7 +271,7 @@ async def help_cb(callback: CallbackQuery):
         f'<b>1.</b> Нажми «Открыть конвертер»\n'
         f'<b>2.</b> Загрузи изображения (JPG, PNG, WEBP, BMP, GIF)\n'
         f'<b>3.</b> Настрой параметры PDF\n'
-        f'<b>4.</b> Нажми «Конвертировать» и скачай файл\n\n'
+        f'<b>4.</b> Нажми «Конвертировать» — PDF придёт прямо в чат\n\n'
         f'<b><tg-emoji emoji-id="5870982283724328568">⚙️</tg-emoji> Настройки:</b>\n'
         f'• <b>Размер</b> — A4, A3, A5, Letter или по фото\n'
         f'• <b>Ориентация</b> — авто, портрет, альбом\n'
@@ -356,6 +354,61 @@ async def handle_health(request: web.Request) -> web.Response:
     return web.Response(text="OK")
 
 
+async def handle_upload(request: web.Request) -> web.Response:
+    """
+    Принимает PDF от мини-приложения и отправляет его в чат пользователю.
+    POST /upload
+    Body (multipart/form-data):
+        - user_id: int
+        - pages: int
+        - filename: str
+        - pdf: file bytes
+    """
+    try:
+        reader = await request.multipart()
+        fields = {}
+        pdf_bytes = None
+        filename = "converted.pdf"
+
+        async for part in reader:
+            if part.name == "pdf":
+                pdf_bytes = await part.read()
+                if part.filename:
+                    filename = part.filename
+            else:
+                fields[part.name] = (await part.read()).decode()
+
+        if not pdf_bytes:
+            return web.json_response({"ok": False, "error": "no pdf"}, status=400)
+
+        user_id = int(fields.get("user_id", 0))
+        pages   = int(fields.get("pages", 0))
+
+        if not user_id:
+            return web.json_response({"ok": False, "error": "no user_id"}, status=400)
+
+        # Отправляем PDF в чат
+        await bot.send_document(
+            chat_id=user_id,
+            document=BufferedInputFile(pdf_bytes, filename=filename),
+            caption=(
+                f'<tg-emoji emoji-id="5870633910337015697">✅</tg-emoji> <b>PDF готов!</b>\n\n'
+                f'<tg-emoji emoji-id="6035128606563241721">🖼</tg-emoji> <b>Страниц:</b> {pages}\n'
+                f'<tg-emoji emoji-id="5884479287171485878">📦</tg-emoji> <b>Размер:</b> {len(pdf_bytes)/1024/1024:.2f} МБ'
+            )
+        )
+
+        # Сохраняем статистику
+        await save_conversion(user_id, pages, len(pdf_bytes), filename)
+
+        logger.info(f"✅ PDF отправлен пользователю {user_id}, страниц: {pages}, размер: {len(pdf_bytes)} байт")
+        return web.json_response({"ok": True})
+
+    except Exception as e:
+        logger.error(f"Upload error: {e}")
+        return web.json_response({"ok": False, "error": str(e)}, status=500)
+
+
 # ===================== STARTUP / SHUTDOWN =====================
 
 async def on_startup(app: web.Application):
@@ -382,15 +435,14 @@ async def on_shutdown(app: web.Application):
 # ===================== APP =====================
 
 def create_app() -> web.Application:
-    app = web.Application()
+    app = web.Application(client_max_size=50 * 1024 * 1024)  # 50MB макс размер PDF
 
-    # Telegram webhook
     SimpleRequestHandler(dispatcher=dp, bot=bot).register(app, path=WEBHOOK_PATH)
     setup_application(app, dp, bot=bot)
 
-    # Routes
     app.router.add_get("/webapp/", handle_webapp)
     app.router.add_get("/webapp",  handle_webapp)
+    app.router.add_post("/upload", handle_upload)
     app.router.add_get("/health",  handle_health)
     app.router.add_get("/",        handle_health)
 
