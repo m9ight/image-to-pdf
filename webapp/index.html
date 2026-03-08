@@ -1,0 +1,1221 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Image to PDF</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        :root {
+            --bg: #0d0d1a;
+            --bg2: #13132b;
+            --bg3: #1a1a35;
+            --card: #1e1e3a;
+            --accent: #e94560;
+            --accent2: #ff6b81;
+            --accent3: #c0392b;
+            --purple: #7c5cbf;
+            --text: #f0f0ff;
+            --text2: #8888aa;
+            --text3: #555577;
+            --success: #2ecc71;
+            --border: rgba(233, 69, 96, 0.25);
+            --shadow: rgba(233, 69, 96, 0.18);
+            --glow: 0 0 40px rgba(233, 69, 96, 0.15);
+        }
+
+        body {
+            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* =========== THEME ADAPTATION =========== */
+        body.tg-theme-light {
+            --bg: #f0f2f8;
+            --bg2: #e4e7f0;
+            --bg3: #d8dcec;
+            --card: #ffffff;
+            --text: #1a1a2e;
+            --text2: #5a5a7a;
+            --text3: #9090b0;
+            --border: rgba(233, 69, 96, 0.3);
+        }
+
+        /* =========== LAYOUT =========== */
+        .container {
+            max-width: 500px;
+            margin: 0 auto;
+            padding: 16px 14px 110px;
+        }
+
+        /* =========== HEADER =========== */
+        .header {
+            text-align: center;
+            padding: 22px 0 20px;
+            position: relative;
+        }
+
+        .header-icon-wrap {
+            position: relative;
+            display: inline-block;
+            margin-bottom: 12px;
+        }
+
+        .header-icon {
+            width: 72px;
+            height: 72px;
+            background: linear-gradient(135deg, var(--accent), var(--purple));
+            border-radius: 22px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 34px;
+            box-shadow: 0 8px 32px rgba(233, 69, 96, 0.35);
+            animation: float 3s ease-in-out infinite;
+        }
+
+        @keyframes float {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-5px); }
+        }
+
+        .header-badge {
+            position: absolute;
+            top: -6px;
+            right: -10px;
+            background: var(--success);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 2px 7px;
+            border-radius: 10px;
+            letter-spacing: 0.5px;
+        }
+
+        .header h1 {
+            font-size: 24px;
+            font-weight: 800;
+            background: linear-gradient(135deg, #fff 0%, var(--accent2) 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            letter-spacing: -0.5px;
+        }
+
+        body.tg-theme-light .header h1 {
+            background: linear-gradient(135deg, #1a1a2e 0%, var(--accent) 100%);
+            -webkit-background-clip: text;
+            background-clip: text;
+        }
+
+        .header p {
+            font-size: 13px;
+            color: var(--text2);
+            margin-top: 5px;
+        }
+
+        .divider {
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--border), transparent);
+            margin: 4px 0;
+        }
+
+        /* =========== UPLOAD =========== */
+        .upload-wrap {
+            position: relative;
+            margin-top: 20px;
+        }
+
+        .upload-area {
+            border: 2px dashed var(--border);
+            border-radius: 22px;
+            padding: 38px 20px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            background: linear-gradient(135deg, rgba(233,69,96,0.04), rgba(124,92,191,0.06));
+            position: relative;
+            overflow: hidden;
+        }
+
+        .upload-area::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at 50% 0%, rgba(233,69,96,0.08) 0%, transparent 70%);
+            pointer-events: none;
+        }
+
+        .upload-area:hover,
+        .upload-area.drag-over {
+            border-color: var(--accent);
+            background: linear-gradient(135deg, rgba(233,69,96,0.10), rgba(124,92,191,0.12));
+            transform: scale(1.01);
+            box-shadow: var(--glow);
+        }
+
+        .upload-area.drag-over {
+            border-style: solid;
+        }
+
+        .upload-icon {
+            font-size: 48px;
+            filter: drop-shadow(0 4px 12px rgba(233,69,96,0.3));
+        }
+
+        .upload-area h3 {
+            font-size: 17px;
+            font-weight: 700;
+            margin: 12px 0 5px;
+            color: var(--text);
+        }
+
+        .upload-area p {
+            font-size: 12px;
+            color: var(--text2);
+        }
+
+        .format-row {
+            display: flex;
+            gap: 5px;
+            justify-content: center;
+            flex-wrap: wrap;
+            margin-top: 14px;
+        }
+
+        .fmt {
+            background: linear-gradient(135deg, rgba(233,69,96,0.15), rgba(124,92,191,0.15));
+            border: 1px solid rgba(233,69,96,0.2);
+            color: var(--accent2);
+            padding: 3px 11px;
+            border-radius: 20px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 0.5px;
+        }
+
+        #fileInput { display: none; }
+
+        /* =========== STATS =========== */
+        .stats-row {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 8px;
+            margin-top: 16px;
+        }
+
+        .stat-box {
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 16px;
+            padding: 14px 8px;
+            text-align: center;
+        }
+
+        .stat-num {
+            font-size: 26px;
+            font-weight: 800;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .stat-lbl {
+            font-size: 10px;
+            color: var(--text2);
+            margin-top: 2px;
+            font-weight: 500;
+        }
+
+        /* =========== IMAGES SECTION =========== */
+        .section {
+            margin-top: 20px;
+        }
+
+        .sec-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 12px;
+        }
+
+        .sec-title {
+            font-size: 15px;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 7px;
+        }
+
+        .btn-clear {
+            background: rgba(233,69,96,0.12);
+            color: var(--accent2);
+            border: 1px solid rgba(233,69,96,0.2);
+            padding: 6px 14px;
+            border-radius: 10px;
+            font-size: 12px;
+            cursor: pointer;
+            font-weight: 600;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .btn-clear:hover {
+            background: rgba(233,69,96,0.22);
+        }
+
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 9px;
+        }
+
+        .img-card {
+            position: relative;
+            border-radius: 16px;
+            overflow: hidden;
+            aspect-ratio: 1;
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.05);
+            animation: popIn 0.3s cubic-bezier(0.34,1.56,0.64,1);
+            cursor: grab;
+            user-select: none;
+        }
+
+        @keyframes popIn {
+            from { opacity: 0; transform: scale(0.75) rotate(-3deg); }
+            to { opacity: 1; transform: scale(1) rotate(0); }
+        }
+
+        .img-card:active { cursor: grabbing; }
+
+        .img-card.dragging {
+            opacity: 0.4;
+            transform: scale(0.92);
+        }
+
+        .img-card.over {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+
+        .img-card img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+
+        .img-num {
+            position: absolute;
+            top: 6px;
+            left: 6px;
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+            color: white;
+            width: 22px;
+            height: 22px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: 800;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.4);
+        }
+
+        .img-del {
+            position: absolute;
+            top: 6px;
+            right: 6px;
+            background: rgba(0,0,0,0.55);
+            backdrop-filter: blur(6px);
+            -webkit-backdrop-filter: blur(6px);
+            color: white;
+            width: 26px;
+            height: 26px;
+            border-radius: 50%;
+            border: none;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 15px;
+            font-family: inherit;
+            transition: all 0.2s;
+        }
+
+        .img-del:hover { background: var(--accent); }
+
+        .img-label {
+            position: absolute;
+            bottom: 0; left: 0; right: 0;
+            padding: 20px 6px 6px;
+            background: linear-gradient(transparent, rgba(0,0,0,0.85));
+            font-size: 9px;
+            color: rgba(255,255,255,0.75);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            font-weight: 500;
+        }
+
+        .drag-tip {
+            text-align: center;
+            font-size: 11px;
+            color: var(--text3);
+            margin-top: 8px;
+        }
+
+        /* =========== SETTINGS =========== */
+        .settings-box {
+            margin-top: 20px;
+            background: var(--card);
+            border-radius: 20px;
+            padding: 18px 16px;
+            border: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .settings-title {
+            font-size: 14px;
+            font-weight: 700;
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--text2);
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            font-size: 11px;
+        }
+
+        .row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 11px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .row:last-child { border-bottom: none; }
+
+        .row-label {
+            font-size: 13px;
+            color: var(--text);
+            font-weight: 500;
+        }
+
+        .row-label small {
+            display: block;
+            font-size: 11px;
+            color: var(--text3);
+            font-weight: 400;
+            margin-top: 1px;
+        }
+
+        select, input[type="number"] {
+            background: var(--bg2);
+            border: 1px solid rgba(255,255,255,0.07);
+            color: var(--text);
+            padding: 7px 12px;
+            border-radius: 11px;
+            font-size: 13px;
+            font-family: inherit;
+            font-weight: 600;
+            outline: none;
+            cursor: pointer;
+            transition: border 0.2s;
+            -webkit-appearance: none;
+        }
+
+        select:focus, input[type="number"]:focus {
+            border-color: var(--accent);
+        }
+
+        input[type="number"] {
+            width: 72px;
+            text-align: center;
+        }
+
+        /* =========== TOGGLE =========== */
+        .toggle {
+            position: relative;
+            width: 46px;
+            height: 26px;
+            flex-shrink: 0;
+        }
+
+        .toggle input { display: none; }
+
+        .slider {
+            position: absolute;
+            inset: 0;
+            background: rgba(255,255,255,0.08);
+            border-radius: 26px;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .slider::before {
+            content: '';
+            position: absolute;
+            height: 20px;
+            width: 20px;
+            left: 3px;
+            bottom: 3px;
+            background: white;
+            border-radius: 50%;
+            transition: 0.3s;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+        }
+
+        .toggle input:checked + .slider {
+            background: linear-gradient(135deg, var(--accent), var(--accent3));
+        }
+
+        .toggle input:checked + .slider::before {
+            transform: translateX(20px);
+        }
+
+        /* =========== CONVERT BUTTON =========== */
+        .btn-area {
+            position: fixed;
+            bottom: 0; left: 0; right: 0;
+            padding: 10px 14px 14px;
+            background: linear-gradient(transparent, var(--bg) 28%);
+            z-index: 100;
+        }
+
+        .btn-convert {
+            width: 100%;
+            max-width: 500px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 17px;
+            background: linear-gradient(135deg, var(--accent) 0%, var(--accent3) 100%);
+            color: white;
+            border: none;
+            border-radius: 18px;
+            font-size: 16px;
+            font-weight: 800;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.3s cubic-bezier(0.34,1.56,0.64,1);
+            box-shadow: 0 6px 28px rgba(233,69,96,0.4);
+            letter-spacing: -0.3px;
+        }
+
+        .btn-convert:disabled {
+            opacity: 0.35;
+            cursor: not-allowed;
+            transform: none !important;
+            box-shadow: none;
+        }
+
+        .btn-convert:not(:disabled):hover {
+            transform: translateY(-2px) scale(1.01);
+            box-shadow: 0 10px 36px rgba(233,69,96,0.5);
+        }
+
+        .btn-convert:not(:disabled):active {
+            transform: scale(0.98);
+        }
+
+        .btn-icon { font-size: 20px; }
+
+        /* =========== PROGRESS =========== */
+        .overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.82);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            z-index: 200;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .overlay.show { display: flex; }
+
+        .modal {
+            background: var(--card);
+            border-radius: 28px;
+            padding: 38px 32px;
+            text-align: center;
+            max-width: 300px;
+            width: 88%;
+            border: 1px solid rgba(255,255,255,0.06);
+            box-shadow: 0 32px 80px rgba(0,0,0,0.6);
+        }
+
+        .spinner {
+            width: 60px;
+            height: 60px;
+            border: 3px solid rgba(255,255,255,0.08);
+            border-top-color: var(--accent);
+            border-radius: 50%;
+            animation: spin 0.75s linear infinite;
+            margin: 0 auto 22px;
+        }
+
+        @keyframes spin { to { transform: rotate(360deg); } }
+
+        .prog-title {
+            font-size: 17px;
+            font-weight: 700;
+            margin-bottom: 5px;
+        }
+
+        .prog-sub {
+            font-size: 12px;
+            color: var(--text2);
+            margin-bottom: 18px;
+            word-break: break-all;
+        }
+
+        .prog-bar-bg {
+            height: 5px;
+            background: rgba(255,255,255,0.07);
+            border-radius: 5px;
+            overflow: hidden;
+        }
+
+        .prog-bar {
+            height: 100%;
+            background: linear-gradient(90deg, var(--accent), var(--accent2));
+            border-radius: 5px;
+            transition: width 0.35s ease;
+            width: 0%;
+        }
+
+        /* =========== SUCCESS =========== */
+        .success-modal {
+            background: var(--card);
+            border-radius: 28px;
+            padding: 38px 28px;
+            text-align: center;
+            max-width: 310px;
+            width: 88%;
+            border: 1px solid rgba(46,204,113,0.2);
+            animation: scaleIn 0.4s cubic-bezier(0.34,1.56,0.64,1);
+        }
+
+        @keyframes scaleIn {
+            from { transform: scale(0.5); opacity: 0; }
+            to { transform: scale(1); opacity: 1; }
+        }
+
+        .success-icon { font-size: 64px; margin-bottom: 16px; }
+
+        .success-title {
+            font-size: 21px;
+            font-weight: 800;
+            color: var(--success);
+            margin-bottom: 8px;
+        }
+
+        .success-info {
+            font-size: 13px;
+            color: var(--text2);
+            line-height: 1.7;
+            margin-bottom: 22px;
+        }
+
+        .success-info b { color: var(--text); }
+
+        .btn-dl {
+            display: block;
+            width: 100%;
+            padding: 13px;
+            background: linear-gradient(135deg, var(--success), #27ae60);
+            color: white;
+            border: none;
+            border-radius: 14px;
+            font-size: 15px;
+            font-weight: 700;
+            font-family: inherit;
+            cursor: pointer;
+            margin-bottom: 8px;
+            transition: all 0.2s;
+        }
+
+        .btn-dl:hover { transform: translateY(-1px); }
+
+        .btn-close {
+            display: block;
+            width: 100%;
+            padding: 13px;
+            background: rgba(255,255,255,0.07);
+            color: var(--text2);
+            border: none;
+            border-radius: 14px;
+            font-size: 14px;
+            font-weight: 600;
+            font-family: inherit;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+
+        .btn-close:hover { background: rgba(255,255,255,0.12); }
+
+        /* =========== PREVIEW =========== */
+        .preview {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: rgba(0,0,0,0.92);
+            z-index: 250;
+            justify-content: center;
+            align-items: center;
+            cursor: zoom-out;
+        }
+
+        .preview.show { display: flex; }
+
+        .preview img {
+            max-width: 92%;
+            max-height: 88vh;
+            border-radius: 14px;
+            object-fit: contain;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.8);
+        }
+
+        .preview-close {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: rgba(255,255,255,0.15);
+            backdrop-filter: blur(8px);
+            border: none;
+            color: white;
+            width: 42px;
+            height: 42px;
+            border-radius: 50%;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-family: inherit;
+        }
+
+        .preview-close:hover { background: rgba(255,255,255,0.25); }
+
+        /* =========== TOAST =========== */
+        .toast {
+            position: fixed;
+            top: 18px;
+            left: 50%;
+            transform: translateX(-50%) translateY(-80px);
+            background: var(--card);
+            border: 1px solid rgba(255,255,255,0.08);
+            color: var(--text);
+            padding: 11px 22px;
+            border-radius: 14px;
+            font-size: 13px;
+            font-weight: 500;
+            z-index: 300;
+            transition: transform 0.45s cubic-bezier(0.34,1.56,0.64,1);
+            white-space: nowrap;
+            box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+            pointer-events: none;
+        }
+
+        .toast.show { transform: translateX(-50%) translateY(0); }
+    </style>
+</head>
+<body>
+<div class="container">
+
+    <!-- HEADER -->
+    <div class="header">
+        <div class="header-icon-wrap">
+            <div class="header-icon">📄</div>
+            <div class="header-badge">FREE</div>
+        </div>
+        <h1>Images → PDF</h1>
+        <p>Конвертируйте фото в один PDF файл</p>
+    </div>
+    <div class="divider"></div>
+
+    <!-- UPLOAD -->
+    <div class="upload-wrap">
+        <div class="upload-area" id="uploadArea">
+            <div class="upload-icon">📸</div>
+            <h3>Загрузите изображения</h3>
+            <p>Нажмите или перетащите сюда</p>
+            <div class="format-row">
+                <span class="fmt">JPG</span>
+                <span class="fmt">PNG</span>
+                <span class="fmt">WEBP</span>
+                <span class="fmt">BMP</span>
+                <span class="fmt">GIF</span>
+            </div>
+        </div>
+        <input type="file" id="fileInput" multiple accept="image/*">
+    </div>
+
+    <!-- STATS -->
+    <div class="stats-row" id="statsRow" style="display:none;">
+        <div class="stat-box">
+            <div class="stat-num" id="cntImages">0</div>
+            <div class="stat-lbl">Изображений</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-num" id="cntSize">0</div>
+            <div class="stat-lbl">МБ</div>
+        </div>
+        <div class="stat-box">
+            <div class="stat-num" id="cntPages">0</div>
+            <div class="stat-lbl">Страниц</div>
+        </div>
+    </div>
+
+    <!-- IMAGES -->
+    <div class="section" id="sectionImages" style="display:none;">
+        <div class="sec-header">
+            <div class="sec-title">🖼 Ваши фото</div>
+            <button class="btn-clear" onclick="clearAll()">🗑 Очистить</button>
+        </div>
+        <div class="grid" id="grid"></div>
+        <div class="drag-tip">💡 Перетащите карточки для смены порядка</div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="settings-box" id="sectionSettings" style="display:none;">
+        <div class="settings-title">⚙ Параметры PDF</div>
+
+        <div class="row">
+            <div class="row-label">
+                Размер страницы
+                <small>Формат листа</small>
+            </div>
+            <select id="pageSize">
+                <option value="fit" selected>По фото</option>
+                <option value="a4">A4</option>
+                <option value="a3">A3</option>
+                <option value="a5">A5</option>
+                <option value="letter">Letter</option>
+            </select>
+        </div>
+
+        <div class="row">
+            <div class="row-label">
+                Ориентация
+                <small>Портрет / Альбом</small>
+            </div>
+            <select id="orientation">
+                <option value="auto" selected>Авто</option>
+                <option value="portrait">Портрет</option>
+                <option value="landscape">Альбом</option>
+            </select>
+        </div>
+
+        <div class="row">
+            <div class="row-label">
+                Качество
+                <small>Сжатие JPEG</small>
+            </div>
+            <input type="number" id="quality" value="90" min="10" max="100" step="5">
+        </div>
+
+        <div class="row">
+            <div class="row-label">
+                Отступы (мм)
+                <small>Поля страницы</small>
+            </div>
+            <input type="number" id="margins" value="0" min="0" max="50" step="5">
+        </div>
+
+        <div class="row">
+            <div class="row-label">
+                Вписать в страницу
+                <small>Масштабировать фото</small>
+            </div>
+            <label class="toggle">
+                <input type="checkbox" id="fitToPage" checked>
+                <span class="slider"></span>
+            </label>
+        </div>
+    </div>
+
+</div>
+
+<!-- CONVERT BTN -->
+<div class="btn-area">
+    <button class="btn-convert" id="btnConvert" disabled onclick="convertToPDF()">
+        <span class="btn-icon">📄</span>
+        <span>Конвертировать в PDF</span>
+    </button>
+</div>
+
+<!-- PROGRESS -->
+<div class="overlay" id="overlayProgress">
+    <div class="modal">
+        <div class="spinner"></div>
+        <div class="prog-title" id="progTitle">Подготовка…</div>
+        <div class="prog-sub" id="progSub">Инициализация</div>
+        <div class="prog-bar-bg">
+            <div class="prog-bar" id="progBar"></div>
+        </div>
+    </div>
+</div>
+
+<!-- SUCCESS -->
+<div class="overlay" id="overlaySuccess">
+    <div class="success-modal">
+        <div class="success-icon">✅</div>
+        <div class="success-title">PDF готов!</div>
+        <div class="success-info" id="successInfo">Файл создан</div>
+        <button class="btn-dl" onclick="downloadPDF()">📥 Скачать PDF</button>
+        <button class="btn-close" onclick="closeSuccess()">Закрыть</button>
+    </div>
+</div>
+
+<!-- PREVIEW -->
+<div class="preview" id="preview" onclick="closePreview()">
+    <button class="preview-close">✕</button>
+    <img id="previewImg" src="" alt="">
+</div>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<script>
+const { jsPDF } = window.jspdf;
+
+let images = [];
+let pdfBlob = null;
+let pdfName = 'converted.pdf';
+let dragFrom = null;
+
+// ===== Telegram =====
+let tg = null;
+try {
+    tg = window.Telegram?.WebApp;
+    if (tg) {
+        tg.ready();
+        tg.expand();
+
+        // Haptic helper
+        window.haptic = (type = 'light') => {
+            try { tg.HapticFeedback?.impactOccurred(type); } catch(e) {}
+        };
+
+        // Theme
+        const p = tg.themeParams;
+        if (p) {
+            const r = document.documentElement;
+            const isDark = tg.colorScheme === 'dark';
+            if (!isDark) document.body.classList.add('tg-theme-light');
+            if (p.bg_color) r.style.setProperty('--bg', p.bg_color);
+            if (p.secondary_bg_color) r.style.setProperty('--card', p.secondary_bg_color);
+            if (p.text_color) r.style.setProperty('--text', p.text_color);
+            if (p.hint_color) r.style.setProperty('--text2', p.hint_color);
+            if (p.button_color) r.style.setProperty('--accent', p.button_color);
+            if (p.button_text_color) r.style.setProperty('--text-btn', p.button_text_color);
+        }
+    }
+} catch(e) {}
+
+if (!window.haptic) window.haptic = () => {};
+
+// ===== DOM =====
+const uploadArea = document.getElementById('uploadArea');
+const fileInput  = document.getElementById('fileInput');
+const grid       = document.getElementById('grid');
+const btnConvert = document.getElementById('btnConvert');
+
+uploadArea.addEventListener('click', () => fileInput.click());
+uploadArea.addEventListener('dragover', e => { e.preventDefault(); uploadArea.classList.add('drag-over'); });
+uploadArea.addEventListener('dragleave', () => uploadArea.classList.remove('drag-over'));
+uploadArea.addEventListener('drop', e => {
+    e.preventDefault();
+    uploadArea.classList.remove('drag-over');
+    handleFiles(e.dataTransfer.files);
+});
+fileInput.addEventListener('change', e => { handleFiles(e.target.files); fileInput.value = ''; });
+
+// ===== FILE HANDLING =====
+function handleFiles(files) {
+    let loaded = 0;
+    const arr = Array.from(files).filter(f => f.type.startsWith('image/'));
+    if (!arr.length) { toast('⚠️ Нет подходящих файлов'); return; }
+
+    arr.forEach(file => {
+        const reader = new FileReader();
+        reader.onload = e => {
+            images.push({ name: file.name, size: file.size, dataUrl: e.target.result });
+            loaded++;
+            if (loaded === arr.length) { haptic('medium'); updateUI(); }
+        };
+        reader.readAsDataURL(file);
+    });
+}
+
+// ===== UI =====
+function updateUI() {
+    const has = images.length > 0;
+    ['statsRow','sectionImages','sectionSettings'].forEach(id =>
+        document.getElementById(id).style.display = has ? '' : 'none'
+    );
+    btnConvert.disabled = !has;
+
+    if (!has) return;
+
+    document.getElementById('cntImages').textContent = images.length;
+    document.getElementById('cntPages').textContent  = images.length;
+    const mb = images.reduce((s,i) => s + i.size, 0) / 1024 / 1024;
+    document.getElementById('cntSize').textContent   = mb.toFixed(1);
+
+    grid.innerHTML = '';
+    images.forEach((img, i) => {
+        const card = document.createElement('div');
+        card.className = 'img-card';
+        card.draggable = true;
+        card.dataset.i = i;
+
+        card.innerHTML = `
+            <img src="${img.dataUrl}" loading="lazy" alt="">
+            <div class="img-num">${i+1}</div>
+            <button class="img-del" onclick="removeImg(event,${i})">✕</button>
+            <div class="img-label">${img.name}</div>
+        `;
+
+        card.querySelector('img').addEventListener('click', () => previewImage(i));
+
+        // Desktop drag
+        card.addEventListener('dragstart', e => {
+            dragFrom = i;
+            setTimeout(() => card.classList.add('dragging'), 0);
+        });
+        card.addEventListener('dragend', () => card.classList.remove('dragging'));
+        card.addEventListener('dragover', e => { e.preventDefault(); card.classList.add('over'); });
+        card.addEventListener('dragleave', () => card.classList.remove('over'));
+        card.addEventListener('drop', e => {
+            e.preventDefault();
+            card.classList.remove('over');
+            if (dragFrom !== null && dragFrom !== i) {
+                const [m] = images.splice(dragFrom, 1);
+                images.splice(i, 0, m);
+                haptic('light');
+                updateUI();
+                toast('🔄 Порядок изменён');
+            }
+            dragFrom = null;
+        });
+
+        // Touch drag (simple swap on long-press release)
+        let touchTimer, touchSrc;
+        card.addEventListener('touchstart', () => {
+            touchTimer = setTimeout(() => { touchSrc = i; haptic('medium'); }, 400);
+        }, { passive: true });
+        card.addEventListener('touchend', () => {
+            clearTimeout(touchTimer);
+        });
+
+        grid.appendChild(card);
+    });
+}
+
+function removeImg(e, i) {
+    e.stopPropagation();
+    images.splice(i, 1);
+    haptic('light');
+    updateUI();
+    toast('🗑 Удалено');
+}
+
+function clearAll() {
+    if (!images.length) return;
+    images = [];
+    updateUI();
+    haptic('medium');
+    toast('🗑 Всё очищено');
+}
+
+function previewImage(i) {
+    document.getElementById('previewImg').src = images[i].dataUrl;
+    document.getElementById('preview').classList.add('show');
+}
+
+function closePreview() {
+    document.getElementById('preview').classList.remove('show');
+}
+
+// ===== CONVERT =====
+async function convertToPDF() {
+    if (!images.length) return;
+    haptic('medium');
+
+    const pageSize   = document.getElementById('pageSize').value;
+    const orientation = document.getElementById('orientation').value;
+    const quality    = parseInt(document.getElementById('quality').value) / 100;
+    const margins    = parseInt(document.getElementById('margins').value);
+    const fitToPage  = document.getElementById('fitToPage').checked;
+
+    showProgress(0, 'Подготовка…', 'Загрузка изображений');
+
+    try {
+        let doc = null;
+        const total = images.length;
+
+        for (let i = 0; i < total; i++) {
+            const pct = Math.round((i + 1) / total * 95);
+            showProgress(pct, `Страница ${i+1} / ${total}`, images[i].name);
+
+            const imgEl = await loadImg(images[i].dataUrl);
+            const W = imgEl.naturalWidth, H = imgEl.naturalHeight;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = W; canvas.height = H;
+            canvas.getContext('2d').drawImage(imgEl, 0, 0);
+            const data = canvas.toDataURL('image/jpeg', quality);
+
+            let orient;
+            if (pageSize === 'fit') {
+                const pxMm = 25.4 / 96;
+                const pw = W * pxMm, ph = H * pxMm;
+                orient = pw > ph ? 'landscape' : 'portrait';
+                if (i === 0) {
+                    doc = new jsPDF({ orientation: orient, unit: 'mm', format: [pw, ph] });
+                } else {
+                    doc.addPage([pw, ph], orient);
+                }
+                doc.addImage(data, 'JPEG', margins, margins, pw - margins*2, ph - margins*2);
+            } else {
+                orient = orientation === 'auto'
+                    ? (W > H ? 'landscape' : 'portrait')
+                    : (orientation === 'landscape' ? 'landscape' : 'portrait');
+
+                if (i === 0) {
+                    doc = new jsPDF({ orientation: orient, unit: 'mm',
+                        format: pageSize === 'letter' ? 'letter' : pageSize });
+                } else {
+                    doc.addPage(pageSize === 'letter' ? 'letter' : pageSize, orient);
+                }
+
+                const pw = doc.internal.pageSize.getWidth();
+                const ph = doc.internal.pageSize.getHeight();
+                const aw = pw - margins*2, ah = ph - margins*2;
+
+                if (fitToPage) {
+                    const ratio = Math.min(aw / W, ah / H);
+                    const dw = W*ratio, dh = H*ratio;
+                    doc.addImage(data, 'JPEG',
+                        margins + (aw-dw)/2, margins + (ah-dh)/2, dw, dh);
+                } else {
+                    doc.addImage(data, 'JPEG', margins, margins, aw, ah);
+                }
+            }
+
+            await sleep(30);
+        }
+
+        showProgress(100, 'Сохранение…', 'Финальная обработка');
+        await sleep(400);
+
+        pdfBlob = doc.output('blob');
+        pdfName  = `pdf_${total}p_${Date.now()}.pdf`;
+        const mb = (pdfBlob.size / 1024 / 1024).toFixed(2);
+
+        hideProgress();
+
+        document.getElementById('successInfo').innerHTML =
+            `<b>${pdfName}</b><br>${total} страниц · ${mb} МБ`;
+        document.getElementById('overlaySuccess').classList.add('show');
+
+        haptic('heavy');
+        try {
+            tg?.HapticFeedback?.notificationOccurred('success');
+        } catch(e) {}
+
+        // Notify bot
+        try {
+            tg?.sendData(JSON.stringify({
+                action: 'pdf_created',
+                pages: total,
+                size: pdfBlob.size,
+                filename: pdfName
+            }));
+        } catch(e) {}
+
+    } catch(err) {
+        hideProgress();
+        toast(`❌ Ошибка: ${err.message}`);
+        console.error(err);
+    }
+}
+
+function loadImg(src) {
+    return new Promise((res, rej) => {
+        const i = new Image();
+        i.onload  = () => res(i);
+        i.onerror = rej;
+        i.src = src;
+    });
+}
+
+function sleep(ms) { return new Promise(r => setTimeout(r, ms)); }
+
+function showProgress(pct, title, sub) {
+    document.getElementById('progTitle').textContent = title;
+    document.getElementById('progSub').textContent   = sub;
+    document.getElementById('progBar').style.width   = pct + '%';
+    document.getElementById('overlayProgress').classList.add('show');
+}
+
+function hideProgress() {
+    document.getElementById('overlayProgress').classList.remove('show');
+}
+
+// ===== DOWNLOAD =====
+function downloadPDF() {
+    if (!pdfBlob) return;
+    const url = URL.createObjectURL(pdfBlob);
+    const a = document.createElement('a');
+    a.href = url; a.download = pdfName;
+    document.body.appendChild(a); a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    toast('📥 Скачивается…');
+    haptic('light');
+}
+
+function closeSuccess() {
+    document.getElementById('overlaySuccess').classList.remove('show');
+}
+
+// ===== TOAST =====
+function toast(msg) {
+    const el = document.getElementById('toast');
+    el.textContent = msg;
+    el.classList.add('show');
+    setTimeout(() => el.classList.remove('show'), 2600);
+}
+
+// ===== KEYBOARD =====
+document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') { closePreview(); closeSuccess(); }
+});
+
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+</script>
+</body>
+</html>
